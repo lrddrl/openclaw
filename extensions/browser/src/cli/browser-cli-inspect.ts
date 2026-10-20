@@ -52,6 +52,42 @@ function parseBrowserChoiceOption<const T extends string>(
   return undefined;
 }
 
+type PendingDialogSummary = { id: string; type?: string; message?: string };
+
+function readPendingDialogs(browserState: unknown): PendingDialogSummary[] {
+  const pending = (browserState as { dialogs?: { pending?: unknown } } | undefined)?.dialogs
+    ?.pending;
+  if (!Array.isArray(pending)) {
+    return [];
+  }
+  return pending.flatMap((entry) => {
+    const record = entry as Record<string, unknown> | null;
+    if (typeof record?.id !== "string") {
+      return [];
+    }
+    return [
+      {
+        id: record.id,
+        type: typeof record.type === "string" ? record.type : undefined,
+        message: typeof record.message === "string" ? record.message : undefined,
+      },
+    ];
+  });
+}
+
+function describeDialogBlockedSnapshot(result: SnapshotResult): string {
+  const lines = [`Snapshot not captured: a pending dialog blocks tab ${result.targetId}.`];
+  for (const dialog of readPendingDialogs(result.browserState)) {
+    const kind = dialog.type ? ` (${dialog.type})` : "";
+    const message = dialog.message ? `: ${JSON.stringify(dialog.message)}` : "";
+    lines.push(`Dialog ${dialog.id}${kind}${message}`);
+    lines.push(
+      `Dismiss it with: openclaw browser dialog --dismiss --dialog-id ${dialog.id} --target-id ${result.targetId}`,
+    );
+  }
+  return lines.join("\n");
+}
+
 function resolveBrowserInspectTimeout(
   command: Command,
   parent: BrowserParentOpts,
@@ -188,6 +224,15 @@ export function registerBrowserInspectCommands(
           query,
         });
         const imagePath = result.format === "ai" ? result.imagePath : undefined;
+
+        // A pending dialog answers with an empty payload and blockedByDialog, so the caller
+        // can dismiss the dialog and retry. Outside --json that flag is the only thing that
+        // separates "no capture happened" from a genuinely blank page, so do not print the
+        // empty payload as a result or write it over an existing --out file. --json without
+        // --out keeps returning the full response, dialog details included.
+        if (result.blockedByDialog && (opts.out || !parent?.json)) {
+          throw new Error(describeDialogBlockedSnapshot(result));
+        }
 
         if (opts.out) {
           const payload =
