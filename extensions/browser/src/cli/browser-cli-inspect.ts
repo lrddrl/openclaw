@@ -54,38 +54,45 @@ function parseBrowserChoiceOption<const T extends string>(
 
 type PendingDialogSummary = { id: string; type?: string; message?: string };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function readPendingDialogs(browserState: unknown): PendingDialogSummary[] {
-  const pending = (browserState as { dialogs?: { pending?: unknown } } | undefined)?.dialogs
-    ?.pending;
+  const dialogs = isRecord(browserState) ? browserState.dialogs : undefined;
+  const pending = isRecord(dialogs) ? dialogs.pending : undefined;
   if (!Array.isArray(pending)) {
     return [];
   }
   return pending.flatMap((entry) => {
-    const record = entry as Record<string, unknown> | null;
-    if (typeof record?.id !== "string") {
+    if (!isRecord(entry) || typeof entry.id !== "string") {
       return [];
     }
     return [
       {
-        id: record.id,
-        type: typeof record.type === "string" ? record.type : undefined,
-        message: typeof record.message === "string" ? record.message : undefined,
+        id: entry.id,
+        type: typeof entry.type === "string" ? entry.type : undefined,
+        message: typeof entry.message === "string" ? entry.message : undefined,
       },
     ];
   });
 }
 
-function describeDialogBlockedSnapshot(result: SnapshotResult): string {
+function describeDialogBlockedSnapshot(result: SnapshotResult, profile?: string): string {
+  // Keep the selected profile in the suggested command: without it the dialog hook goes to
+  // the default profile, where this target may not exist, and the dialog stays pending.
+  const profileFlag = profile ? ` --browser-profile=${profile}` : "";
   const lines = [`Snapshot not captured: a pending dialog blocks tab ${result.targetId}.`];
   for (const dialog of readPendingDialogs(result.browserState)) {
     const kind = dialog.type ? ` (${dialog.type})` : "";
     const message = dialog.message ? `: ${JSON.stringify(dialog.message)}` : "";
     lines.push(`Dialog ${dialog.id}${kind}${message}`);
     lines.push(
-      `Dismiss it with: openclaw browser dialog --dismiss --dialog-id ${dialog.id} --target-id ${result.targetId}`,
+      `Dismiss it with: openclaw browser dialog${profileFlag} --dismiss --dialog-id ${dialog.id} --target-id ${result.targetId}`,
     );
   }
-  return lines.join("\n");
+  return lines.join("
+");
 }
 
 function resolveBrowserInspectTimeout(
@@ -231,7 +238,7 @@ export function registerBrowserInspectCommands(
         // empty payload as a result or write it over an existing --out file. --json without
         // --out keeps returning the full response, dialog details included.
         if (result.blockedByDialog && (opts.out || !parent?.json)) {
-          throw new Error(describeDialogBlockedSnapshot(result));
+          throw new Error(describeDialogBlockedSnapshot(result, normalizeOptionalString(profile)));
         }
 
         if (opts.out) {

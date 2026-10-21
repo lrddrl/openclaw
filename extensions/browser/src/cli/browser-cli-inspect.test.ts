@@ -48,6 +48,7 @@ describe("browser cli snapshot defaults", () => {
     const browser = program
       .command("browser")
       .option("--json", "JSON output", false)
+      .option("--browser-profile <name>", "Browser profile")
       .option("--timeout <ms>", "Timeout in ms", "30000");
     registerBrowserInspectCommands(browser, (cmd) => cmd.parent?.opts() ?? {});
     await program.parseAsync(withJson ? ["browser", "--json", ...args] : ["browser", ...args], {
@@ -239,6 +240,18 @@ describe("browser cli snapshot defaults", () => {
         expect(runtime.writeJson).not.toHaveBeenCalled();
       },
     );
+
+    it("keeps a non-default browser profile in the dismiss command", async () => {
+      sharedMocks.callBrowserRequest.mockResolvedValueOnce(blocked("ai"));
+
+      await expect(
+        runBrowserInspect(["--browser-profile", "work", "snapshot"]),
+      ).rejects.toThrow("__exit__:1");
+
+      expect(allErrorText()).toContain(
+        "openclaw browser dialog --browser-profile=work --dismiss --dialog-id d1 --target-id t1",
+      );
+    });
 
     it("keeps returning the dialog details in --json mode", async () => {
       sharedMocks.callBrowserRequest.mockResolvedValueOnce(blocked("ai"));
