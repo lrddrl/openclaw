@@ -87,8 +87,7 @@ function describeDialogBlockedSnapshot(result: SnapshotResult, profile?: string)
       `Dismiss it with: openclaw browser dialog${profileFlag} --dismiss --dialog-id ${dialog.id} --target-id ${result.targetId}`,
     );
   }
-  return lines.join("
-");
+  return lines.join("\n");
 }
 
 function resolveBrowserInspectTimeout(

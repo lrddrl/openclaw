@@ -248,9 +248,9 @@ describe("browser cli snapshot defaults", () => {
     it("keeps a non-default browser profile in the dismiss command", async () => {
       sharedMocks.callBrowserRequest.mockResolvedValueOnce(blocked("ai"));
 
-      await expect(
-        runBrowserInspect(["--browser-profile", "work", "snapshot"]),
-      ).rejects.toThrow("__exit__:1");
+      await expect(runBrowserInspect(["--browser-profile", "work", "snapshot"])).rejects.toThrow(
+        "__exit__:1",
+      );
 
       expect(allErrorText()).toContain(
         "openclaw browser dialog --browser-profile=work --dismiss --dialog-id d1 --target-id t1",
