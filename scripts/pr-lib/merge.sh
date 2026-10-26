@@ -661,10 +661,13 @@ merge_run() {
       [ "$auto_merge_requested" = false ] && [ "$cancel_auto" = false ] &&
       [ -z "$merged_head$observed_head$legacy_directory$refusal_directory" ] &&
       [ "$recovery_oid" = "$MERGE_OUTCOME_OID" ] &&
-      printf '%s\n' "$MERGE_OUTCOME_RECORD" | jq -e '
-        .phase == "intent" and .route == "auto" and .method == "squash" and
-        .cancellation.state == "confirmed"' >/dev/null || {
-        merge_outcome_stop "current workflow recovery requires the selected confirmed cancelled auto outcome and replacement head"
+      printf '%s\n' "$MERGE_OUTCOME_RECORD" | jq -e --arg replacement "$replacement_head" \
+        --argjson admin "$MERGE_USE_PRIOR_CI_ADMIN" '
+        .phase == "intent" and .method == "squash" and
+        (if $replacement != "" then .route == "auto" and .cancellation.state == "confirmed"
+         else $admin and .route == "admin" and .accepted == false and
+           .priorCiAdmin.dispatchTransport == "rest" end)' >/dev/null || {
+        merge_outcome_stop "current workflow recovery requires the selected cancelled auto outcome or confirmed same-head REST admin recovery"
         return 1
       }
   fi
@@ -1188,13 +1191,13 @@ merge_run() {
           75)
             MERGE_PRIOR_CI_PROOF=""
             [ -n "$MERGE_PRIOR_CI_REMATERIALIZE_MAIN" ] || return 1
-            # Discard authority before fetching the exact missing main object.
+            # Fetching proves ancestry, not a fresh projection. The next snapshot
+            # advances the observed cursor under the retained missing-tip floor.
             rematerialization_started=$(pr_merge_now)
             verify_merge_main_advance "$MERGE_OBSERVED_MAIN" "$MERGE_PRIOR_CI_REMATERIALIZE_MAIN" || return 1
             if [ -n "$MERGE_PRIOR_CI_UNKNOWN_START" ]; then
               MERGE_PRIOR_CI_UNKNOWN_START=$((MERGE_PRIOR_CI_UNKNOWN_START + $(pr_merge_now) - rematerialization_started))
             fi
-            MERGE_OBSERVED_MAIN="$MERGE_PRIOR_CI_REMATERIALIZE_MAIN"
             ;;
           76)
             MERGE_PRIOR_CI_PROOF=""
