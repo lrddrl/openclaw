@@ -8,7 +8,7 @@ import {
 } from "openclaw/plugin-sdk/number-runtime";
 import { captureRuntimeConfigAsyncReader } from "openclaw/plugin-sdk/runtime-config-snapshot";
 import { defaultRuntime } from "openclaw/plugin-sdk/runtime-env";
-import { normalizeOptionalString } from "openclaw/plugin-sdk/string-coerce-runtime";
+import { isRecord, normalizeOptionalString } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { shortenHomePath } from "openclaw/plugin-sdk/text-utility-runtime";
 import type { SnapshotResult } from "../browser/client.js";
 import { writeExternalFileWithinOutputRoot } from "../browser/output-files.js";
@@ -49,10 +49,6 @@ function parseBrowserChoiceOption<const T extends string>(
 }
 
 type PendingDialogSummary = { id: string; type?: string; message?: string };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function readPendingDialogs(browserState: unknown): PendingDialogSummary[] {
   const dialogs = isRecord(browserState) ? browserState.dialogs : undefined;
